@@ -1,0 +1,121 @@
+{
+  "$schema": "https://skills.developer.anthropic.com/schemas/manifest/v1.json",
+  "name": "devflow-v5",
+  "version": "5.0.0",
+  "description": "DevFlow v5 - 企业级开发流程编排器。智能路由项目类型（绿地/棕地/中途），自动推荐流程模式（Quick/Standard/Rigorous），支持批量处理、断点续传、技能编排和团队协作。",
+  "author": {
+    "name": "pwl1987",
+    "email": "devflow@example.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/pwl1987/devflow-v5",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pwl1987/devflow-v5.git"
+  },
+  "keywords": [
+    "workflow",
+    "automation",
+    "project-management",
+    "bmad",
+    "development-flow",
+    "batch-processing",
+    "checkpoint",
+    "distributed-state"
+  ],
+  "capabilities": {
+    "trigger": {
+      "patterns": [
+        "查看状态",
+        "继续开发",
+        "断点续传",
+        "开始新项目",
+        "批量处理",
+        "绿地项目",
+        "棕地项目",
+        "项目进度",
+        "开发流程",
+        "workflow"
+      ],
+      "excludePatterns": [
+        "简单的 Git 操作",
+        "运行测试代码",
+        "与 BMAD/项目管理无关的文档"
+      ]
+    },
+    "parameters": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "命令类型",
+            "enum": ["status", "new", "continue", "batch", "story", "review", "test", "commit", "help"]
+          },
+          "mode": {
+            "type": "string",
+            "description": "流程模式",
+            "enum": ["quick", "standard", "rigorous"]
+          },
+          "batchSize": {
+            "type": "number",
+            "description": "批量处理数量",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "onFailure": {
+            "type": "string",
+            "description": "失败处理策略",
+            "enum": ["pause", "skip", "record"]
+          },
+          "storyId": {
+            "type": "string",
+            "description": "故事ID",
+            "pattern": "^[E][0-9]+-[S][0-9]+$"
+          }
+        }
+      }
+    },
+    "permissions": {
+      "required": [
+        "read:workspace",
+        "read:project",
+        "write:state"
+      ],
+      "optional": [
+        "write:workspace",
+        "execute:skills",
+        "network:github"
+      ]
+    },
+    "output": {
+      "format": "markdown",
+      "includes": [
+        "status",
+        "recommendations",
+        "next_steps",
+        "errors"
+      ]
+    }
+  },
+  "adapter": {
+    "entry": "lib/claude-adapter/index.ts",
+    "parameterResolver": "lib/claude-adapter/ParameterResolver.js",
+    "resultFormatter": "lib/claude-adapter/ResultFormatter.js",
+    "errorAdapter": "lib/claude-adapter/ErrorAdapter.js"
+  },
+  "dependencies": {
+    "node": ">=18.0.0",
+    "typescript": ">=5.3.0"
+  },
+  "entryPoints": {
+    "main": "index.ts",
+    "types": "index.d.ts"
+  },
+  "testing": {
+    "framework": "jest",
+    "coverageThreshold": 80,
+    "testCommand": "npm test",
+    "testPath": "__tests__"
+  }
+}
