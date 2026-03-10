@@ -25,6 +25,18 @@ describe('FlowConcurrencyManager', () => {
   });
 
   afterEach(() => {
+    // 确保所有等待队列都被清空，避免 Promise 挂起
+    const waitingFlows = manager.getWaitingFlows();
+    waitingFlows.forEach(flowId => {
+      manager.cancelWaitingFlow(flowId);
+    });
+
+    // 释放所有运行中的流程
+    const runningFlows = manager.getRunningFlows();
+    runningFlows.forEach(flow => {
+      manager.releaseFlowSlot(flow.flowId, 'completed');
+    });
+
     FlowConcurrencyManager.clearInstance();
   });
 
@@ -80,10 +92,10 @@ describe('FlowConcurrencyManager', () => {
       await manager.acquireFlowSlot('flow-1', 'greenfield');
       await manager.acquireFlowSlot('flow-2', 'brownfield');
 
-      // 填满等待队列
-      await manager.acquireFlowSlot('flow-3', 'greenfield');
-      await manager.acquireFlowSlot('flow-4', 'brownfield');
-      await manager.acquireFlowSlot('flow-5', 'greenfield');
+      // 填满等待队列（不 await，因为它们会挂起）
+      manager.acquireFlowSlot('flow-3', 'greenfield');
+      manager.acquireFlowSlot('flow-4', 'brownfield');
+      manager.acquireFlowSlot('flow-5', 'greenfield');
 
       // 下一个请求应该被拒绝
       await expect(manager.acquireFlowSlot('flow-6', 'brownfield')).rejects.toThrow(
@@ -151,7 +163,9 @@ describe('FlowConcurrencyManager', () => {
     it('应该返回正确的统计信息', async () => {
       await manager.acquireFlowSlot('flow-1', 'greenfield');
       await manager.acquireFlowSlot('flow-2', 'brownfield');
-      await manager.acquireFlowSlot('flow-3', 'greenfield');
+
+      // 第三个流程会进入等待队列
+      manager.acquireFlowSlot('flow-3', 'greenfield');
 
       const stats = manager.getStats();
       expect(stats.currentRunning).toBe(2);
@@ -175,11 +189,11 @@ describe('FlowConcurrencyManager', () => {
     it('应该返回等待中的流程列表', async () => {
       await manager.acquireFlowSlot('flow-1', 'greenfield');
       await manager.acquireFlowSlot('flow-2', 'brownfield');
-      await manager.acquireFlowSlot('flow-3', 'greenfield');
+      manager.acquireFlowSlot('flow-3', 'greenfield');
 
       const waitingFlows = manager.getWaitingFlows();
       expect(waitingFlows).toContain('flow-3');
-    }, 10000);
+    });
 
     it('应该允许取消等待中的流程', async () => {
       await manager.acquireFlowSlot('flow-1', 'greenfield');
@@ -195,7 +209,7 @@ describe('FlowConcurrencyManager', () => {
 
       const waitingFlows = manager.getWaitingFlows();
       expect(waitingFlows).not.toContain('flow-3');
-    }, 10000);
+    });
 
     it('应该取消不存在的流程时返回 false', () => {
       const cancelled = manager.cancelWaitingFlow('non-existent');

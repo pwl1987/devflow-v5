@@ -34,9 +34,9 @@ export interface HookExecutionResult {
   hookId: string;
   phase: HookPhase;
   success: boolean;
-  duration: number;  // 执行耗时（毫秒）
-  output: string;    // 标准输出
-  error?: string;    // 错误信息（如果失败）
+  duration: number; // 执行耗时（毫秒）
+  output: string; // 标准输出
+  error?: string; // 错误信息（如果失败）
 }
 
 // ============ 钩子配置 ============
@@ -45,9 +45,10 @@ export interface HookConfig {
   phase: HookPhase;
   command: string;
   run_condition?: HookRunCondition;
-  blocking?: boolean;  // 是否阻塞主流程
+  blocking?: boolean; // 是否阻塞主流程
   timeout_seconds?: number;
   enabled?: boolean;
+  priority?: number; // 优先级 (1-10, 10 最高, 默认 5)
 }
 
 // ============ 钩子注册信息 ============
@@ -55,6 +56,7 @@ export interface HookRegistration extends HookConfig {
   registeredAt: string;
   lastExecuted?: string;
   executionCount: number;
+  priority: number; // 必需字段，默认 5
 }
 
 // ============ 钩子执行上下文 ============
@@ -141,11 +143,16 @@ export class HookManager implements IHookManager {
    */
   private initializePhaseMap(): void {
     const phases: HookPhase[] = [
-      'pre-project', 'post-project',
-      'pre-phase', 'post-phase',
-      'pre-story', 'post-story',
-      'pre-skill', 'post-skill',
-      'pre-commit', 'post-commit',
+      'pre-project',
+      'post-project',
+      'pre-phase',
+      'post-phase',
+      'pre-story',
+      'post-story',
+      'pre-skill',
+      'post-skill',
+      'pre-commit',
+      'post-commit'
     ];
 
     phases.forEach(phase => {
@@ -162,12 +169,23 @@ export class HookManager implements IHookManager {
       ...hook,
       id: hookId,
       enabled: hook.enabled !== false,
+      priority: hook.priority ?? 5, // 默认优先级 5
       registeredAt: new Date().toISOString(),
-      executionCount: 0,
+      executionCount: 0
     };
 
     const phaseHooks = this.hooks.get(hook.phase) || [];
     phaseHooks.push(registration);
+
+    // 按优先级排序（高到低），同优先级按注册时间排序
+    phaseHooks.sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return b.priority - a.priority; // 优先级降序
+      }
+      // 同优先级按注册时间升序（先注册的先执行）
+      return a.registeredAt.localeCompare(b.registeredAt);
+    });
+
     this.hooks.set(hook.phase, phaseHooks);
 
     return hookId;
@@ -241,6 +259,7 @@ export class HookManager implements IHookManager {
           blocking: hook.blocking,
           timeout_seconds: hook.timeout_seconds,
           enabled: hook.enabled,
+          priority: hook.priority
         });
       }
     }
@@ -252,7 +271,10 @@ export class HookManager implements IHookManager {
    * 执行单个钩子
    * @internal
    */
-  private async executeHook(hook: HookRegistration, context: HookExecutionContext): Promise<HookExecutionResult> {
+  private async executeHook(
+    hook: HookRegistration,
+    context: HookExecutionContext
+  ): Promise<HookExecutionResult> {
     const startTime = Date.now();
     const timeout = hook.timeout_seconds || 30; // 默认30秒超时
 
@@ -269,7 +291,7 @@ export class HookManager implements IHookManager {
         success: false,
         duration: Date.now() - startTime,
         output: '',
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
@@ -291,7 +313,7 @@ export class HookManager implements IHookManager {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32bit integer
     }
     return Math.abs(hash).toString(16);
@@ -310,7 +332,7 @@ export const BuiltinHookTemplates: Record<string, Omit<HookConfig, 'id'>> = {
     command: 'npm run lint && npm run test',
     run_condition: 'always',
     blocking: true,
-    timeout_seconds: 60,
+    timeout_seconds: 60
   },
 
   // 文档生成（post-story）
@@ -319,7 +341,7 @@ export const BuiltinHookTemplates: Record<string, Omit<HookConfig, 'id'>> = {
     command: 'npm run docs:generate',
     run_condition: 'on_success',
     blocking: false,
-    timeout_seconds: 30,
+    timeout_seconds: 30
   },
 
   // 测试执行（post-skill）
@@ -328,7 +350,7 @@ export const BuiltinHookTemplates: Record<string, Omit<HookConfig, 'id'>> = {
     command: 'npm run test -- --coverage',
     run_condition: 'always',
     blocking: false,
-    timeout_seconds: 120,
+    timeout_seconds: 120
   },
 
   // 通知发送（post-phase）
@@ -337,6 +359,6 @@ export const BuiltinHookTemplates: Record<string, Omit<HookConfig, 'id'>> = {
     command: 'echo "Phase completed: $(date)"',
     run_condition: 'on_success',
     blocking: false,
-    timeout_seconds: 10,
-  },
+    timeout_seconds: 10
+  }
 };
